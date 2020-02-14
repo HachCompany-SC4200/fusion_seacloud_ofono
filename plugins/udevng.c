@@ -1904,16 +1904,16 @@ static void check_usb_device(struct udev_device *device)
 		DBG("%s [%s:%s]", drv, vendor, model);
 
 		for (i = 0; vendor_list[i].driver; i++) {
-			if (g_str_equal(vendor_list[i].drv, drv) == FALSE)
+			if (drv && (g_str_equal(vendor_list[i].drv, drv) == FALSE))
 				continue;
 
 			if (vendor_list[i].vid) {
-				if (!g_str_equal(vendor_list[i].vid, vendor))
+				if (vendor && (g_str_equal(vendor_list[i].vid, vendor) == FALSE))
 					continue;
 			}
 
 			if (vendor_list[i].pid) {
-				if (!g_str_equal(vendor_list[i].pid, model))
+				if (model && (g_str_equal(vendor_list[i].pid, model) == FALSE))
 					continue;
 			}
 
@@ -2065,7 +2065,7 @@ static gboolean udev_event(GIOChannel *channel, GIOCondition cond,
 
 		check_device(device);
 
-		udev_delay = g_timeout_add_seconds(1, check_modem_list, NULL);
+		udev_delay = g_timeout_add_seconds(3, check_modem_list, NULL);
 	} else if (g_str_equal(action, "remove") == TRUE)
 		remove_device(device);
 
