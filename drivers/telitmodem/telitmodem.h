@@ -32,6 +32,8 @@ extern void telit_trace_init();
 extern void telit_trace_exit();
 extern void telit_urc_init();
 extern void telit_urc_exit();
+extern void telit_provider_init();
+extern void telit_provider_exit();
 extern void telit_power_management_init();
 extern void telit_power_management_exit();
 extern void telit_data_network_init();

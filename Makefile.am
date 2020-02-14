@@ -28,6 +28,7 @@ pkginclude_HEADERS = include/log.h include/plugin.h include/history.h \
 			include/storage.h \
 			include/telit-trace.h \
 			include/telit-urc.h \
+			include/telit-provider.h \
 			include/telit-power-management.h\
 			include/telit-data-network.h \
 			include/telit-hw-management.h \
@@ -340,6 +341,7 @@ builtin_sources += drivers/atmodem/atutil.h \
 			drivers/telitmodem/radio-settings.c \
 			drivers/telitmodem/telit-trace.c \
 			drivers/telitmodem/telit-urc.c \
+			drivers/telitmodem/telit-provider.c \
 			drivers/telitmodem/telit-power-management.c \
 			drivers/telitmodem/telit-data-network.c \
 			drivers/telitmodem/telit-hw-management.c \
@@ -706,6 +708,7 @@ src_ofonod_SOURCES = $(builtin_sources) $(gatchat_sources) src/ofono.ver \
 			src/netmon.c \
 			src/telit-trace.c \
 			src/telit-urc.c \
+			src/telit-provider.c \
 			src/telit-power-management.c \
 			src/telit-data-network.c \
 			src/telit-hw-management.c \

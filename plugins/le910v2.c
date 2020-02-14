@@ -56,6 +56,7 @@
 #include <ofono/voicecall.h>
 #include <ofono/telit-trace.h>
 #include <ofono/telit-urc.h>
+#include <ofono/telit-provider.h>
 #include <ofono/telit-power-management.h>
 #include <ofono/telit-data-network.h>
 #include <ofono/telit-hw-management.h>
@@ -73,6 +74,8 @@
 static const char *none_prefix[] = { NULL };
 static const char *qss_prefix[] = { "#QSS:", NULL };
 static const char *cfun_prefix[] = { "+CFUN:", NULL };
+static const char *fwswitch_prefix[]= { "#FWSWITCH:", NULL };
+static const char *usbcfg_prefix[]= { "#USBCFG:", NULL };
 
 struct le910v2_data {
 	GAtChat *chat;		/* AT chat */
@@ -80,6 +83,7 @@ struct le910v2_data {
 	struct ofono_sim *sim;
 	ofono_bool_t have_sim;
 	ofono_bool_t sms_phonebook_added;
+	ofono_bool_t modem_needs_reset;
 };
 
 static void le910v2_debug(const char *str, void *user_data)
@@ -381,6 +385,133 @@ static int le910v2_disable(struct ofono_modem *modem)
 	return -EINPROGRESS;
 }
 
+static void telit_multitech_reboot_cb(gboolean ok, GAtResult *result, gpointer user_data)
+{
+	struct ofono_modem *modem = user_data;
+	struct le910v2_data *data = ofono_modem_get_data(modem);
+
+	DBG("%p", modem);
+
+	if (!ok) {
+		DBG("Unable to trigger reboot for Multitech modem");
+		return;
+	}
+
+	/*
+	g_at_chat_cancel_all(data->modem);
+	g_at_chat_unregister_all(data->modem);
+	g_at_chat_cancel_all(data->chat);
+	g_at_chat_unregister_all(data->chat);
+	*/
+	DBG("Multitech reboot triggered successfully");
+}
+
+static void telit_multitech_fwswitch_cb(gboolean ok, GAtResult *result, gpointer user_data)
+{
+	struct ofono_modem *modem = user_data;
+	struct le910v2_data *data = ofono_modem_get_data(modem);
+	int provider_status;
+	GAtResultIter iter;
+
+	DBG("%p", modem);
+
+	if (!ok) {
+		DBG("Multitech modem not able to detect FWSWITCH/ProviderMode setting");
+		return;
+	}
+
+	g_at_result_iter_init(&iter, result);
+
+	if (!g_at_result_iter_next(&iter, "#FWSWITCH:")) {
+		DBG("Multitech modem not able to parse FWSWITCH/ProviderMode setting (first part)");
+		return;
+	}
+
+	if (!g_at_result_iter_next_number(&iter, &provider_status)) {
+		DBG("Multitech modem not able to parse FWSWITCH/ProviderMode setting (second part)");
+		return;
+	}
+
+	if (provider_status != 1) {
+		DBG("Multitech modem in wrong ProviderMode detected, switching to 'Verizon'");
+		g_at_chat_send(data->chat, "AT#FWSWITCH=1,1", fwswitch_prefix,
+				telit_multitech_reboot_cb, modem, NULL);
+		
+	} else {
+		DBG("Multitech already in correct ProviderMode");
+		if (data->modem_needs_reset) {
+			DBG("Multitech modem needs restart after USBCFG changed");
+			g_at_chat_send(data->chat, "AT#REBOOT", none_prefix,
+				telit_multitech_reboot_cb, modem, NULL);
+		}
+	}
+}
+
+static void telit_multitech_usbcfg_cb(gboolean ok, GAtResult *result, gpointer user_data)
+{
+	struct ofono_modem *modem = user_data;
+	struct le910v2_data *data = ofono_modem_get_data(modem);
+
+	DBG("%p", modem);
+
+	if (!ok) {
+		return;
+	}
+
+	g_at_chat_send(data->chat, "AT#FWSWITCH?", fwswitch_prefix,
+				telit_multitech_fwswitch_cb, modem, NULL);
+}
+
+static void telit_multitech_usbcfg(gboolean ok, GAtResult *result, gpointer user_data)
+{
+	struct ofono_modem *modem = user_data;
+	struct le910v2_data *data = ofono_modem_get_data(modem);
+	int usbcfg_status;
+	GAtResultIter iter;
+
+	DBG("%p", modem);
+
+	if (!ok) {
+		return;
+	}
+
+	g_at_result_iter_init(&iter, result);
+
+	if (!g_at_result_iter_next(&iter, "#USBCFG:")) {
+		return;
+	}
+
+	if (!g_at_result_iter_next_number(&iter, &usbcfg_status)) {
+		return;
+	}
+
+	if (usbcfg_status != 2) {
+		DBG("Multitech modem in wrong USBCFG mode detected, setting to 2");
+		data->modem_needs_reset = TRUE;
+		g_at_chat_send(data->chat, "AT#USBCFG=2", usbcfg_prefix,
+			telit_multitech_usbcfg_cb, modem, NULL);
+	} else {
+		DBG("Multitech already in correct USBCFG mode");
+		g_at_chat_send(data->chat, "AT#FWSWITCH?", fwswitch_prefix,
+					telit_multitech_fwswitch_cb, modem, NULL);
+	}
+}
+
+static void telit_multitech_setup(gboolean ok, GAtResult *result, gpointer user_data)
+{
+	struct ofono_modem *modem = user_data;
+	struct le910v2_data *data = ofono_modem_get_data(modem);
+
+	DBG("%p", modem);
+
+	if (!ok) {
+		return;
+	}
+
+	g_at_chat_send(data->chat, "AT#USBCFG?", usbcfg_prefix,
+				telit_multitech_usbcfg, modem, NULL);
+}
+
 static void le910v2_pre_sim(struct ofono_modem *modem)
 {
 	struct le910v2_data *data = ofono_modem_get_data(modem);
@@ -394,8 +525,12 @@ static void le910v2_pre_sim(struct ofono_modem *modem)
 //							 data->chat);
 	ofono_telit_power_management_create(modem, 0, "telitmodem", data->chat);
 	ofono_telit_hw_management_create(modem, 0, "telitmodem", data->chat);
-    ofono_telit_me_control_create(modem, 0, "telitmodem", data->chat);
+	ofono_telit_me_control_create(modem, 0, "telitmodem", data->chat);
 	ofono_telit_custom_create(modem, 0, "telitmodem", data->chat);
+
+	// Check for multitech modem. If we have AT#FWSWITCH it's multitech.
+	g_at_chat_send(data->chat, "AT#FWSWITCH=?", fwswitch_prefix,
+				telit_multitech_setup, modem, NULL);
 }
 
 static void le910v2_post_online(struct ofono_modem *modem)
@@ -412,8 +547,9 @@ static void le910v2_post_online(struct ofono_modem *modem)
 	DBG("%p", modem);
 
 	ofono_radio_settings_create(modem, TELIT_MODEM_LE910V2, "telitmodem",
-                                data->chat);
+					data->chat);
 	ofono_telit_urc_create(modem, 0, "telitmodem", data->chat);
+	ofono_telit_provider_create(modem, 0, "telitmodem", data->chat);
 	ofono_telit_data_network_create(modem, 0, "telitmodem", data->chat);
 	ofono_netreg_create(modem, OFONO_VENDOR_TELIT, "atmodem", data->chat);
 

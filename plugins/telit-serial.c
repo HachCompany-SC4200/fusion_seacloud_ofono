@@ -61,6 +61,7 @@
 #include <ofono/ussd.h>
 #include <ofono/voicecall.h>
 #include <ofono/telit-urc.h>
+#include <ofono/telit-provider.h>
 #include <ofono/telit-power-management.h>
 #include <ofono/telit-data-network.h>
 #include <ofono/telit-hw-management.h>
@@ -473,6 +474,7 @@ static void telit_serial_post_online(struct ofono_modem *modem)
 
 	ofono_radio_settings_create(modem, 0, "telitmodem", data->chat);
 	ofono_telit_urc_create(modem, OFONO_VENDOR_TELIT_SERIAL, "telitmodem", data->chat);
+	ofono_telit_provider_create(modem, OFONO_VENDOR_TELIT_SERIAL, "telitmodem", data->chat);
 
 #ifdef DISABLE_OFONO_CONTEXTS
 	ofono_telit_data_network_create(modem, 0, "telitmodem", data->chat);

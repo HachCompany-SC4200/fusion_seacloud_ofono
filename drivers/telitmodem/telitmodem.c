@@ -41,6 +41,7 @@ static int telitmodem_init(void)
 	telit_radio_settings_init();
 	telit_trace_init();
 	telit_urc_init();
+	telit_provider_init();
 	telit_power_management_init();
 	telit_data_network_init();
 	telit_hw_management_init();
@@ -56,6 +57,7 @@ static void telitmodem_exit(void)
 	telit_radio_settings_exit();
 	telit_trace_exit();
 	telit_urc_exit();
+	telit_provider_exit();
 	telit_power_management_exit();
 	telit_data_network_exit();
 	telit_hw_management_exit();
