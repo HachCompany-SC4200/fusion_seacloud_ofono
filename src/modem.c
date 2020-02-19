@@ -87,6 +87,7 @@ struct ofono_modem {
 	void			*driver_data;
 	char			*driver_type;
 	char			*name;
+	ofono_bool_t            workaround_multitech;
 };
 
 struct ofono_devinfo {

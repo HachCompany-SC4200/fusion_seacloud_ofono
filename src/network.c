@@ -1527,17 +1527,26 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem;
+	gboolean workaround_multitech = FALSE;
 
 	if (netreg->signal_strength == strength)
 		return;
 
 	/*
-	 * Theoretically we can get signal strength even when not registered
-	 * to any network.  However, what do we do with it in that case?
+	 * In theory we have signal strength even when not registered to a network. For most
+	 * modems we don't update/show the values, since there is no use to them.
+	 * Multitech modems on the verizon network are not appearing as registered to the network
+	 * but only "attached" via the connectionmanager.
+	 * To still be able to show signal strength in these cases we will update signal strength
+	 * on multitech even if not registered to the network.
 	 */
 	if (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
-			netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING)
-		return;
+			netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING) {
+		modem = __ofono_atom_get_modem(netreg->atom);
+		workaround_multitech = ofono_modem_get_boolean(modem, "workaround_multitech");
+		if (workaround_multitech == NULL || workaround_multitech != TRUE)
+			return;
+	}
 
 	DBG("strength %d", strength);
 

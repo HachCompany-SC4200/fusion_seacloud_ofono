@@ -505,8 +505,12 @@ static void telit_multitech_setup(gboolean ok, GAtResult *result, gpointer user_
 	DBG("%p", modem);
 
 	if (!ok) {
+		ofono_modem_set_boolean(modem, "workaround_multitech", FALSE);
 		return;
 	}
+
+	DBG("Multitech workaround set for modem %p", modem);
+	ofono_modem_set_boolean(modem, "workaround_multitech", TRUE);
 
 	g_at_chat_send(data->chat, "AT#USBCFG?", usbcfg_prefix,
 				telit_multitech_usbcfg, modem, NULL);
